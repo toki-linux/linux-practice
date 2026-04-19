@@ -1,1 +1,18 @@
-# linux-practice
+# Linux Practice
+
+## 目的
+Linuxの学習記録と検証
+
+## やったこと
+- SSH接続
+- nginx起動確認
+- systemctl操作
+- ログ確認(journalctl / access.log)
+
+## 学んだこと
+- サービス　→　ポート　→　通信の切り分け
+- ログから原因を特定する流れ
+
+##次にやること
+- cronで自動化
+- ログ監視
