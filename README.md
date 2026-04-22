@@ -1,7 +1,7 @@
 # Linux Practice
 
 ## 目的
-Linuxの学習記録と検証
+Linuxの学習記録と検証。整理はしてません
 
 ## やったこと
 - SSH接続
