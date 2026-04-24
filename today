@@ -1,0 +1,145 @@
+## やること
+各課題ごとに👇
+状態を作る
+症状を確認
+ログを見る
+原因を特定
+解決する
+
+## 一番大事「なぜそうなったか」だけは絶対書け
+
+## 環境
+VirtualBox上のubuntuからnginxを起動しホスト(Mac)からSSH接続をし操作している
+ポートフォワーディングを使用している。
+
+課題1. 👉 Webページが見れなくなる状況を作れ
+条件👇
+ブラウザからアクセスすると正常に表示されない状態を作る
+その状態から原因を特定し、復旧させる
+
+1. nginxサービスが起動していない場合
+sudo sysytemctl stop nginx   原因特定方法　journalctl -u nginx でいつ停止したかをみる。サービスが止まる＝ポートも閉じている。サービスが停まっている時/var/logにはログ残らない
+2. nginxサービスは起動しているがポートは閉じている＝listenしていないor途中で遮断されている。
+①nginxの設定側でポートを消す
+sudo nano /etc/nginx/sites-available/defaultでコメントアウトした。それでもうまくいかなかった。
+なぜか？⇨sudo nginx -t で成功と出ていた。それでも一度再起動してみた。ss -tulnで確認してみるとまだ一つlisten状態であった。  
+/etc/nginx/sites-available/defaultを確認してみても80番ポートは全てコメントアウトしてあった。別のファイルでポートが開いている可能性が高いがどこかわからない。
+defaultでlistenをコメントアウトしても、serverブロックが有効なままだとnginxがデフォルトで80番をlistenすることがある。
+そのため設定を外す必要があり、sites-enabledから削除する。
+このときrmコマンドを使うとファイル削除に見えるが、
+ls -l /etc/nginx/sites-enabled/で確認すると
+/etc/nginx/sites-available/defaultへのシンボリックリンクであることがわかる。
+つまり削除しているのはリンクであり、元ファイルは消えないため安全に無効化できる。
+戻し方　sudo ln -s /etc/nginx/sites-available/default /etc/nginx/sites-enabled/defaultでまたシンボリックリンクで繋げる。その後コメントアウトを外す。その後サービス再起動
+serverブロックがある限り、nginxはどこかのポートで待ち受けようとする
+👉 listen が無いと デフォルトで 0.0.0.0:80 にバインドすることがある
+ポートをとじてもserverが残って居るのならnginxはデフォルトでポートを開いて居る可能性がある。それが80番だったのでコメントアウトしても80番ポートが残っていた
+原因特定方法　ss -tulnp で空いてるポートを見る。これで出ない場合ポートは閉じている。　この場合も/var/logにはログ届かない。
+
+②ポート開いている。でも繋がらない。
+パターン①：　localhostだけで待たせる
+/etc/nginx/sites-available/defaultの中身をいじる(今回はnanoを使った)。今listen状態になっている80ポートをコメントアウトしてlisten 127.0.0.1:80 default_server;をその下に追加  
+isten 127.0.0.1:80 default_server;はlocalhostにだけポート８０番を開いているという解釈。IPを制限しているという考え方ではない。
+サービスを再起動して反映
+localhostにしかポート開けていないので、サーバからしかアクセスできない
+
+パターン②：　nginx側で拒否
+/etc/nginx/sites-available/defaultの中身をいじる(nanoを使った)。その中にdeny all;というのがコメントアウトされているのでそれを外す。するとnginxがすべてのクライアントからのアクセスを拒否する。
+エラーコード403が出る。403の意味はサーバは届いているけどアクセス禁止という意味。
+外部アクセス
+↓
+ポート80（OK）
+↓
+nginx（ここで判定） ← ★今回ここで止まる
+↓
+ファイルアクセス（権限チェック）なので、ファイルの権限は異常なくてもそれ以前で止められる
+サーバー側でcurlしてもクライアント扱いになる
+”同じマシンでも通信している以上はクライアントになる”
+パターン③：　ファイアウォールで遮断
+sudo ufw status で状態確認　→　enactiveだったので、sudo ufw enable → 80番をブロック sudo ufw deny 80 → statusで確認して80 DENY と表示されていれ設定完了
+これでcurl localhostをサーバで行うとwebページが表示されるが別PCからcurlを実行するとファイアウォールによって弾かれる
+戻すときはこれ　sudo ufw delete deny 80　
+ファイアウォールを設定したいときはufwコマンドを使う
+
+Macで新たにターミナルを作るとき
+■ 一番ラク（ショートカット）
+⌘ + N → 新しいウィンドウが開く
+⌘ + T → 新しいタブが開く（同じウィンドウ内）
+■ メニューから
+上のメニューバー
+→「シェル」→「新規ウインドウ」 or 「新規タブ」
+■ Dockから
+ターミナルのアイコンを右クリック
+→「新規ウインドウ」
+
+
+
+
+【テーマ】
+サービスは起動しているのにポートは閉じている状態の理解（nginx）
+■ 結論
+「サービス起動」と「ポート開放」は別物
+・systemctl status → プロセスの状態
+・ss / lsof → ポートの状態
+👉 activeでもポートは閉じていることがある
+■ 状態の定義
+① サービス起動中
+→ nginxプロセスが動いている
+② ポート開放
+→ nginxがlistenしている
+👉 両方揃って初めて通信できる
+■ 今回の構成理解
+nginxは複数ファイルで構成される
+/etc/nginx/nginx.conf
+  ↓ include
+/etc/nginx/sites-enabled/*
+  ↓（シンボリックリンク）
+/etc/nginx/sites-available/*
+👉 sites-enabled にあるものだけが有効
+■ コメントアウトの意味
+# listen 80;
+👉 #がついた行は完全に無効
+👉 空白があっても関係なし
+■ なぜポートが開いていたのか
+・listenをコメントアウトしても
+→ serverブロックが残っていると
+→ nginxがデフォルトで80番を使うことがある
+👉 listen削除だけでは不十分
+■ ポートを閉じる正しい方法
+① サイトを無効化する
+sudo rm /etc/nginx/sites-enabled/default
+👉 シンボリックリンク削除＝無効化
+👉 本体は消えない
+■ なぜ安全か
+sites-enabled/default はリンク
+default -> /etc/nginx/sites-available/default
+👉 削除しているのは「参照」だけ
+👉 設定ファイル本体は残る
+■ 復元方法
+sudo ln -s /etc/nginx/sites-available/default /etc/nginx/sites-enabled/default
+■ 確認コマンド
+・サービス確認
+systemctl status nginx
+・ポート確認
+ss -tulnp | grep :80
+・プロセス確認
+lsof -i :80
+・設定確認
+nginx -T | grep listen
+■ トラブルシュートの流れ
+① systemctl status → 起動確認
+② ss / lsof → ポート確認
+③ nginx -T → 設定確認
+④ sites-enabled → 有効ファイル確認
+👉 「設定」「プロセス」「ネットワーク」を分けて考える
+■ 重要ポイント
+・サービス起動 ≠ ポート開放
+・設定ファイルは複数箇所に分散
+・コメントアウトだけでは不十分な場合あり
+・sites-enabled が実際の有効の設定の場合あり
+「起動してるのに繋がらない」は
+設定・プロセス・ネットワークの切り分けで解決する
+
+ログを見たときに時刻がおかしかった
+dateコマンドで見るとUTCだった。つまり。ローカルタイムではなかった。
+tzselectで日本の時刻を探しtimedatectl set-timezoneで日本の時刻に設定した
