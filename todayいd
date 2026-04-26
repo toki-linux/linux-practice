@@ -1,0 +1,100 @@
+課題⑤（最終フェーズ）
+
+👉 error.logに原因が出る状態を作れ            
+
+条件
+ブラウザでアクセスするとエラーになる
+access.logにも記録は残る
+error.logを見れば原因が分かる
+
+🧠 やること（これだけ守れ）
+
+各パターンで👇
+
+症状
+access.log
+error.log
+原因
+解決
+
+💡 ポイント
+👉 ここ意識👇
+👉 error.logに“具体的な原因”が出る状態
+
+準備
+ターミナルを複数用意し、/var/log/nginx/access.logとvar/log/nginx/error.logをリアルタイムで見えるようにした。
+
+## やったこと
+
+①nginxの設定ファイルを変える
+deny all のコメントアウトを外し、全てのアクセスを拒否した。
+access.logにはエラーコード403が表示されていた
+error.logには2026/04/26 12:28:34 [error] 1402#1402: *1 access forbidden by rule,
+client: 127.0.0.1, server: _, request: "GET / HTTP/1.1", host: "localhost"
+と表示されており、ルールによりアクセス許可がないと出ている。
+解決法はnginxの設定ファイルを元に戻すこと。設定ファイルは複数あるが一つ崩すだけでサービスは正常に動かなくなる。
+今回は/etc/nginx/sites-enabled/defaultの中身をいじった
+
+②/var/www/htmlディレクトリの中のファイルの権限を変える
+/var/www/html/index.htmlファイルの権限を644から600に変更した。
+access.logにはエラーコード403が表示されていた。
+error.logには2026/04/26 12:22:58 [error] 738#738: *4 "/var/www/html/index.html" is forbidden (13: Permission denied),
+client: 10.0.2.2, server: _, request: "GET / HTTP/1.1", host: "localhost:8080"
+と表示されており、アクセスを禁止されたと出ている。
+解決法はファイルの権限を所有者やグループ以外のユーザからも見えるようにすること。644など。
+
+③ファイル配置をずらす
+/var/www/html/html/index.htmlとし不必要なディレクトリを追加してみた
+access.logにはエラーコード403が表示されていた。
+error.logには2026/04/26 12:40:53 [error] 1418#1418: *6 directory index of "/var/www/html/" is forbidden,
+client: 10.0.2.2, server: _, request: "GET / HTTP/1.1", host: "localhost:8080"
+と表示されており、indexファイルがないから中身見せようとしたけど、それは禁止されてると出ている。
+解決法はnginxの設定ファイルを追加されたも含め設定し直すか、不必要なディレクトリを消す
+ちなみに、エラーコード404の時はerror.logにログは出るとは限らない
+なぜ？→ 404は異常コードに見えるがサービスから見たら正常であることもあるため。
+
+## 学び
+- access.log は「どのリクエストが来て、結果どうなったか」を確認するログである。  
+- error.log は「なぜ失敗したか」を確認するログである。
+- 403でも原因は1つではなく、設定による拒否、ファイル権限、indexファイル不在など複数ある。  
+そのため、ステータスコードだけで決めつけず、error.logの具体的なメッセージを見て原因を切り分ける必要がある。
+
+
+## 実験の時に起こった出来事
+
+エラコード404を作り出すために/var/www/html/ディレクトリの中のファイルをホームディレクトリのtestというディレクトリにmvで移した。
+計画通りエラーコード404は出たので、元に戻そうとした。ここで問題発生
+/var/www/html/から~/testへは mv /var/www/html ~/test として移動させた。なので、これの反対を行った。
+mv ~/test /var/www/html としたら/var/www/html/html/というふうにhtmlディレクトリの中にhtmlディレクトリができてしまった。
+なぜこうなった？ → mvは上書きではなく移動先が既存のディレクトリだとその中に入れる動きをするため。
+例：　　mv ~/test /var/www/html とすると構造的には、/var/www/html/test となる。test=htmlディレクトリなので、/var/www/html/htmlとなる
+
+解決法
+中身を一つ上に戻す
+sudo mv /var/www/html/html/* /var/www/html 
+隠しファイルも含めて全てのファイルが移動できているか確認
+ls -la /var/www/html/html
+空になっていたら削除していい。一応rmではなくrmdirを使う
+rmdir /var/www/html/html
+確認
+ls -la /var/www/html
+
+本来どう戻すべきだったか
+sudo mv /var/www/html ~/test　こうしたのなら
+
+sudo mv ~/test/html /var/www/　戻す時は親ディレクトリに戻す
+
+中身だけ移動したい場合
+mv /var/www/html/* ~/test　これで良い。メタキャラクタを使う
+戻す時は
+mv ~/test/* /var/www/html 
+
+一言まとめ
+mv ディレクトリA ディレクトリB
+で、Bがすでに存在する場合、
+AはBの中に入る。
+
+質問
+「/var/www/html を移動したのに、なぜ html が既存で残っていた？」
+■ 結論
+どこかのタイミングでhtmlディレクトリが再作成された。パッケージによる影響だと考えられる
