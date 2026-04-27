@@ -1,0 +1,167 @@
+# 今日の学習まとめ（nginx / 403 / 404 / 権限 / URL構造）
+
+## ■ 403 と 404 の違い
+
+* **404 Not Found**
+
+  * リクエストされたファイルが存在しない
+  * 例：/index.html が存在しない
+
+* **403 Forbidden**
+
+  * ファイルやディレクトリは存在するが、アクセスが許可されていない
+  * 原因例：
+
+    * 権限不足
+    * nginx設定（deny all）
+    * indexファイルがない + ディレクトリ一覧禁止
+
+👉 一言で
+
+* 404 = 無い
+* 403 = あるけど見せない
+
+---
+
+## ■ なぜ index.html が無いと 403 になるのか
+
+ブラウザで以下にアクセス：
+
+```text
+http://localhost/
+```
+
+nginxの動き：
+
+1. /var/www/html/（ディレクトリ）にアクセス
+2. index.html を探す
+3. 無い
+4. ディレクトリ一覧表示も禁止
+
+👉 結果：403
+
+---
+
+## ■ 404になるケース
+
+```text
+http://localhost/index.html
+```
+
+nginxの動き：
+
+1. /var/www/html/index.html を探す
+2. 無い
+
+👉 結果：404
+
+---
+
+## ■ URLの構造
+
+```text
+http://ホスト:ポート/パス
+```
+
+例：
+
+```text
+http://localhost:8080/index.html
+```
+
+* localhost → 接続先
+* 8080 → ポート
+* /index.html → ファイル
+
+👉 ポートは必ずホストの直後に書く
+
+---
+
+## ■ ポートフォワーディング時のcurl
+
+ホストPCから：
+
+```bash
+curl http://localhost:8080/index.html
+```
+
+Ubuntu内から：
+
+```bash
+curl http://localhost/index.html
+```
+
+👉 access.logに出ない = nginxに届いていない
+
+---
+
+## ■ nginxのindexの仕組み
+
+```nginx
+index index.html index.htm index.nginx-debian.html;
+```
+
+👉 ディレクトリにアクセスすると自動でindexファイルを探す
+
+---
+
+## ■ autoindexの挙動
+
+* indexあり → 200（表示）
+* indexなし + autoindex off → 403
+* indexなし + autoindex on → 一覧表示（200）
+
+---
+
+## ■ mvコマンドと権限
+
+```bash
+mv ~/test/* /var/www/html/
+```
+
+👉 判定基準：
+
+* 移動先ディレクトリに書き込み権限があるか
+
+通常：
+
+```bash
+/var/www/html → root所有
+```
+
+👉 一般ユーザは書けない → sudo必要
+
+---
+
+## ■ ディレクトリ権限の本質
+
+ファイルにアクセスする条件：
+
+```text
+ディレクトリに入れる（x） + ファイルを読める（r）
+```
+
+例：
+
+* ファイル：666 → 読める
+* ディレクトリ：700 → 入れない
+
+👉 結果：アクセス不可
+
+---
+
+## ■ 学び（重要）
+
+* nginxは「URL → ファイル or ディレクトリ」で処理する
+* 403と404の違いは「存在」と「権限」
+* ファイルの権限よりディレクトリの権限が重要
+* ポート番号はURL構造の一部
+* access.logに出ない = 通信が届いていない
+
+---
+
+## ■ 次にやること
+
+* 404ケースをREADME形式でまとめる
+* 403（permission / directory）を追加
+* 502エラーの再現（余裕あれば）
