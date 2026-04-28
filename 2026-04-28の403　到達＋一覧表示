@@ -1,0 +1,53 @@
+# 403 Forbidden（directory index is forbidden）
+
+## 概要
+ブラウザでアクセスした時に403が表示される
+
+## 症状
+ブラウザで403エラー
+
+## 原因
+ドキュメントルート配下に index.html などのインデックスファイルが存在しない状態で、
+nginxの設定によりディレクトリ一覧表示（autoindex）が無効になっているため、
+ディレクトリの中身を表示できず403 Forbiddenとなった。
+
+## 解決
+/var/www/html/ディレクトリの中に、webページとなるファイルを入れる。nginx設定ファイルの一覧表示しない設定をoffにする
+例：
+sudo mv ~/test/* /var/www/html/ とし、ファイルを戻す
+nano /etc/nginx/sites-enabled/default とし、autoindex on；とする
+
+## 切り分け手順
+1. access.logで403エラーを確認
+2. error.logで「directory index is forbidden」を確認
+3. nginx設定ファイルのrootディレクトリを確認
+4. ドキュメントルート配下にindexファイルが存在するか確認
+5. autoindex設定を確認
+
+## 再現手順
+ドキュメントルート配下のファイルを移動し、nginx設定ファイルのautoindexをoffにする。
+
+## 学び
+nginxはディレクトリにアクセスされた場合、まずindexファイルを探し、
+存在しない場合はautoindexの設定に従って一覧表示を行う。
+そのどちらもできない場合に403 Forbiddenとなることを理解した。
+
+
+## 応用（任意）
+403の種類の一つとして知っておける
+nginx設定ファイルの中を見ると原因が特定できる
+
+
+コマンドを以下のように打った
+toki@ubuntu-toki:~$ ls -ld /var/www/html
+drwxrwxr-x 2 toki toki 4096 Apr 28 17:17 /var/www/html
+error.logが下のやつ
+2026/04/28 17:24:09 [error] 1454#1454: *3 directory index of "/var/www/html/" is forbidden, client: 10.0.2.2, server: _, request: "GET / HTTP/1.1", host: "localhost:8080"
+
+これってなんでforbiddenなの？これって、設定ファイルのディレクトリまではいけたんだけど、その先のファイルがないかつそのディレクトリを一覧表示するのを禁止されているからこのようなerror.logが出ると聞いたのだが、ls -ld で見るとothersでも、見えるんじゃない？
+
+/var/www/html/ というディレクトリまでは行けた。
+でも表示する index.html がない。
+だからディレクトリの中身一覧を出そうとした。
+でも nginx は通常、一覧表示を禁止している。
+だから 403 Forbidden。
