@@ -1,0 +1,103 @@
+403 Forbidden（アクセス拒否）
+■ 概要
+
+nginxはリクエストを受け取り、対象のパスまでは到達できたが、アクセスが許可されていないため表示できなかった。
+
+■ 症状
+
+ブラウザでアクセスすると以下が表示される。
+
+403 Forbidden
+■ 原因（パターン別）
+① ディレクトリはあるがindexファイルがない
+directory index of "/var/www/html/" is forbidden
+
+👉 意味
+
+ディレクトリには到達できた
+でも index.html がない
+かつ ディレクトリ一覧表示がoff
+
+👉 nginxのデフォルト
+
+autoindex off;
+② ファイル権限不足
+
+error.log例👇
+
+Permission denied
+
+👉 意味
+
+nginx（www-dataなど）がファイルを読む権限がない
+③ nginx設定で拒否している
+
+例👇
+
+deny all;
+
+👉 意味
+
+nginxの設定で意図的にアクセス拒否している
+■ 切り分け手順
+
+① access.log確認
+
+tail -f /var/log/nginx/access.log
+→ 403 が出ているか確認
+
+② error.log確認（最重要）
+
+tail -f /var/log/nginx/error.log
+
+ここで判断👇
+
+directory index → indexファイル問題
+Permission denied → 権限問題
+
+③ ファイル確認
+
+ls -l /var/www/html
+
+👉 index.htmlがあるか確認
+
+④ 権限確認
+
+ls -ld /var/www/html
+
+👉 othersに r-x があるか確認
+
+⑤ nginx設定確認
+
+sudo nginx -T
+
+👉 deny / location / root を確認
+
+■ 解決方法
+パターン①（indexなし）
+echo "hello" > /var/www/html/index.html
+パターン②（権限）
+chmod 755 /var/www/html
+chmod 644 /var/www/html/index.html
+パターン③（設定）
+deny all;
+
+👉 コメントアウト or 削除
+
+■ 学び（本質）
+403は「存在しない」ではなく、
+「存在しているがアクセスできない」状態
+■ 404との違い
+404 → ファイル・パスが存在しない
+403 → 存在するがアクセスできない
+■ 一言まとめ（強い）
+403 Forbiddenは、nginxが対象のパスに到達できているが、
+権限や設定によりアクセスが拒否されている状態である
+■ 応用（実務視点）
+403は大きく3パターンに分かれる
+
+① indexファイルなし（directory index）
+② 権限不足（Permission denied）
+③ nginx設定による拒否（deny）
+
+error.logを見ることで原因を特定できる
