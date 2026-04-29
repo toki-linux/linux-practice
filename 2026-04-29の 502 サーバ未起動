@@ -1,0 +1,74 @@
+# 502 Bad Gateway（upstreamサーバ未起動）
+
+## 概要
+nginxがproxy_passで指定されたupstreamサーバに接続できず、502 Bad Gatewayとなった。
+
+## 症状
+ブラウザまたはcurlでアクセスすると502エラーが表示された。
+
+```bash
+curl http://localhost:8080/
+
+## 原因
+
+nginx設定のproxy_passで指定されたupstreamサーバが起動しておらず、
+nginxから接続できなかったためエラーとなった。
+
+具体的には、接続先ポートに対して通信できず、
+Connection refused（接続拒否）となっていた。
+
+## 解決
+
+upstreamサーバを起動し、指定ポートで待ち受けていることを確認した。
+
+# サーバ起動（例）
+node app.js
+
+# ポート確認
+ss -lntp | grep 3000
+
+その後、再度アクセスすると正常にレスポンスが返るようになった。
+
+## 切り分け手順
+access.logで502エラーを確認
+error.logでupstream接続失敗のログを確認
+connect() failed (111: Connection refused) while connecting to upstream
+nginx設定ファイルのproxy_pass先を確認
+指定されたポートでサーバが起動しているか確認
+サーバ起動後、再度アクセス
+再現手順
+
+proxy_passで指定したサーバを停止する。
+
+例：
+
+# サーバ停止
+Ctrl + C
+
+その状態でアクセスすると502が発生する。
+
+## 学び
+
+502エラーは、nginx自体ではなく、
+その先のupstreamサーバとの通信に問題があるときに発生する。
+
+特に、以下のような状態で発生する。
+
+サーバ未起動
+ポート未開放
+ポート番号のミス
+ファイアウォールによる遮断
+
+また、error.logを見ることで、
+「接続拒否」や「タイムアウト」など原因の特定が可能である。
+
+## 応用
+
+502が発生した場合は、nginx設定ではなく、
+upstream側の状態を優先的に確認する。
+
+特に以下をチェックする。
+
+サーバが起動しているか
+指定ポートで待ち受けているか
+proxy_passのURLが正しいか
