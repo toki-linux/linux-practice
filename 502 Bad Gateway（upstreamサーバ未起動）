@@ -1,0 +1,131 @@
+# 502 Bad Gateway（upstreamサーバ未起動）
+
+## 概要
+ブラウザでアクセスした時に502と表示される
+
+## 症状
+ブラウザで502エラー
+
+## 原因
+nginx設定ファイルのlocationの欄が
+存在し無いポートに繋いでいた
+
+## 解決
+sudo nano /etc/nginx/sites-enabled/defaultで設定ファイルのlocationの欄を本来のポートに編集
+sudo nginx -t でシステムに異常がないかチェック
+sudo systemctl reload nginx　でシステムを反映
+
+
+## 切り分け手順
+1. access.logで502確認
+2. error.logでlocationの文を確認
+3. 設定ファイルの中を確認
+
+## 再現手順
+設定ファイルのlocationの設定を開いてい無いポートに書き換える
+例：
+location / {
+        proxy_pass http://localhost:3000
+}
+
+
+## 学び
+何が理解できたか（本質）
+ポートがあいてい無い時のerror.logの出方
+nginxがどのようにproxyとして動くか。
+
+## 応用（任意）
+動くプロセスは違くても似たような状況に対応できる
+
+
+模範解答
+# 502 Bad Gateway（ポート不一致）
+
+## 概要
+nginxのproxy_passで指定したポートと、
+実際にupstreamサーバが待ち受けているポートが一致せず、502となった。
+
+## 症状
+ブラウザまたはcurlでアクセスすると502エラーが表示された。
+
+```bash
+curl http://localhost:8080/
+```
+
+## 原因
+upstreamサーバ自体は起動していたが、
+nginx設定のproxy_passで指定したポートが異なっていた。
+
+例：
+
+```nginx
+location / {
+    proxy_pass http://127.0.0.1:3000;
+}
+```
+
+実際のサーバは3001番で起動していたため、
+nginxが3000番に接続しようとして失敗し、502となった。
+
+## 解決
+proxy_passのポート番号を正しい値に修正した。
+
+```nginx
+location / {
+    proxy_pass http://127.0.0.1:3001;
+}
+```
+
+その後、設定を確認し反映。
+
+```bash
+sudo nginx -t
+sudo systemctl reload nginx
+```
+
+## 切り分け手順
+1. access.logで502エラーを確認
+2. error.logで接続失敗のログを確認
+
+```text
+connect() failed (111: Connection refused) while connecting to upstream
+```
+
+3. nginx設定ファイルのproxy_pass先を確認
+4. ssコマンドで実際に待ち受けているポートを確認
+
+```bash
+ss -lntp | grep 300
+```
+
+5. 「サーバは起動しているがポートが違う」と判断
+
+## 再現手順
+upstreamサーバを3001番で起動した状態で、
+nginx設定を3000番にする。
+
+```nginx
+location / {
+    proxy_pass http://127.0.0.1:3000;
+}
+```
+
+## 学び
+502エラーは「サーバが落ちている場合」だけでなく、
+「接続先ポートの不一致」でも発生する。
+
+そのため、以下の切り分けが重要。
+
+- サーバが起動しているか
+- 正しいポートで待ち受けているか
+- nginxの設定と一致しているか
+
+## 応用
+502エラー時は、以下の2パターンを即座に切り分ける。
+
+- upstream未起動
+- ポート不一致
+
+error.logとssコマンドを組み合わせることで、迅速に原因特定が可能となる。
+
+
