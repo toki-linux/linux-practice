@@ -1,0 +1,30 @@
+# 502 Bad Gateway（upstreamサーバ未起動）
+
+## 概要
+nginxから裏側のupstreamサーバへ転送しようとしたが、接続先のサーバが起動していなかったため502エラーが発生した。
+
+## 症状
+ブラウザでアクセスすると502 Bad Gatewayが表示された。
+
+## 原因
+nginxの設定で `proxy_pass http://127.0.0.1:3000;` を指定していたが、127.0.0.1の3000番ポートでアプリケーションサーバが起動していなかった。
+
+そのため、nginxはupstreamサーバへ接続できず、502 Bad Gatewayを返した。
+
+## 解決
+upstreamサーバを起動する。
+
+または、`proxy_pass` の接続先ポートを、実際にサーバが起動しているポートに修正する。
+
+## 切り分け手順
+1. ブラウザで502 Bad Gatewayを確認
+2. access.logで502が記録されていることを確認
+3. error.logで `connect() failed` と `Connection refused` を確認
+4. nginxがupstreamサーバに接続できていないと判断
+5. `ss -lntp` で3000番ポートがLISTENしていないことを確認
+6. upstreamサーバ未起動が原因と判断
+
+## 学び
+502はnginx自体の停止ではなく、nginxが裏側のサーバに接続できないときに発生する。
+
+nginxが起動していても、proxy_pass先のアプリケーションサーバが起動していなければ、502 Bad Gatewayになる。
