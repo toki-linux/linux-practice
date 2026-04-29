@@ -1,0 +1,54 @@
+aliasを設定してみた。正常に動く編
+
+## 流れ
+1. ubuntu側で置き換える用のディレクトリとwebページの内容となるファイルを作成した
+mkdir -p /var/www/img
+echo test | sudo tee /var/www/img/test.html
+2. nginx設定ファイルのなかのlocationのところを編集した
+sudo nano /etc/nginx/sites-enabled/default
+location /images/ {
+         alias /var/www/img/;
+}
+3. 設定ファイルに異常がないか確認
+sudo nginx -t
+4. 異常がなかったのでnginxを再起動
+sudo systemctl restart nginx
+5. ブラウザでURLを打ってみて動くか確認
+curl http://localhost:8080/images/
+6. access.logに403エラーが出た。
+tail -f /var/log/nginx/access.log
+7. error.logで原因確認
+tail -f /var/log/nginx/error.log
+2026/04/29 10:47:16 [error] 2741#2741: *2 directory index of "/var/www/img/" is forbidden, client: 10.0.2.2, server: _, request: "GET /images/ HTTP/1.1", host: "localhost:8080"
+8. error.logを見ると/var/www/imgディレクトリではリクエスト禁止されていると推測
+9. /var/www/img/test.htmlの全ての権限を確認。問題はなし
+10. nginx設定ファイルにtest.htmlファイルを読み込めと設定してい無いんじゃないかと推測
+  # Add index.php to the list if you are using PHP
+        index index.html index.htm index.nginx-debian.html;
+11. それっぽいやつを設定ファイルから見つけたので、そこにtest.htmlを追加
+  # Add index.php to the list if you are using PHP
+        index index.html index.htm index.nginx-debian.html test.html;
+12. 設定ファイルに異常がでないか確認
+sudo nginx -t
+13.異常がなかったのでnginx再起動
+sudo systemctl restart nginx
+14. ブラウザで動くか確認
+curl http://localhost:8080/images/
+15.test.htmlファイルの中身が表示された。成功！！！
+
+## 学び
+alias設定により、/images/ は /var/www/img/ に正しく対応していた。
+
+ただし、/images/ のようにファイル名を指定せずディレクトリにアクセスした場合、
+nginxは index に指定されたファイルを探す。
+
+今回、/var/www/img/ 配下には test.html しかなく、
+index設定に test.html が含まれていなかったため、
+ディレクトリ一覧表示もできず 403 Forbidden となった。
+
+index設定に test.html を追加したことで、
+/images/ へのアクセス時に /var/www/img/test.html が表示されるようになった。
+
+
+
+
