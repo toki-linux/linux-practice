@@ -1,0 +1,63 @@
+なぜpython3 -m http.server 3001を~/upstream-testディレクトリで行ったのか？
+推測
+python3 -m http.server 3001は今いるディレクトリをpython3サーバに変えてポートは3001版で待ち受けますよというコードなのではないか？
+
+実験
+mkdir test
+echo "test" > ~/test/stat.html　とし今度はこのtestディレクトリでpython3を使ってみる
+結果
+toki@ubuntu-toki:~$ curl http://localhost
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<title>Directory listing for /</title>
+</head>
+<body>
+<h1>Directory listing for /</h1>
+<hr>
+<ul>
+<li><a href="stat.html">stat.html</a></li>
+</ul>
+<hr>
+</body>
+</html>
+がでた
+
+原因特定
+中身の書式が間違っているのでは？例えば文字コードや改行がubuntuと異なるなど
+→ そんなことはない。正常通りに動く~/upstream-test/index.htmlの中身も見たが~/test/stat.htmlの書式と異なったところはなかった
+
+stat.htmlというのがおかしいのでは？おかしいとは、nginx設定ファイルに設定されてい無いのではないか
+→ 違うかった。設定ファイルにstat.htmlを追加して設定ファイルが正常かチェックして設定を反映させたが変わらなかった。一応python3プロセスも立て直した
+
+~test/ディレクトリにindex.htmlファイルを追加してアクセスしに行ってみた。
+→　アクセスできた。stat.htmlではダメでindex.htmlではいけた。
+なぜこうなったのか？nginx設定ファイルにはstat.htmlを設定したのに。。。
+答え
+curl http://localhost
+↓
+nginxが受ける
+↓
+nginxがPythonサーバへ渡す
+↓
+Pythonサーバが / を処理する
+↓
+Pythonは index.html を探す
+↓
+index.html がない
+↓
+ディレクトリ一覧を返す
+
+つまり、nginx側の設定をいじっても意味がない。nginxはupstreamしているだけだから。設定ファイルをいじるならpython3設定ファイル
+
+ーーーーーーーーーーーーーーーーーーーー
+stat.htmlをnginxのindex一覧に追加した
+でもnginxはファイルを直接返していない
+Pythonサーバに丸投げしている
+だからPython側は / に対して index.html を探した
+stat.html は自動表示されなかった
+ーーーーーーーーーーーーーーーーーーーーー
+
+なおinde.htmlは他のディレクトリにもあったが、中身を変えてみた。すると、変えた中身がページとして表示された。
+つまり、ファイル名が同じでもディレクトリが違うと別のものだと判別できることがわかった。
