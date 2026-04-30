@@ -1,0 +1,29 @@
+## ⑦ アクセスは来るがページが表示されない（index指定ミス）
+
+### 症状
+ブラウザまたはcurlで http://localhost にアクセスすると、ページが表示されず403 Forbiddenになった。
+
+### 状況
+/var/www/html/stat.html は存在していた。
+root /var/www/html; の指定も正しかった。
+しかし nginx の index 指定は index.html のみだった。
+
+### 原因
+/ にアクセスした時、nginxは root 配下の index.html を探す。
+しかし index.html が存在しなかったため、表示するファイルが見つからなかった。
+ディレクトリ一覧表示も許可されていなかったため、403 Forbidden になった。
+
+### 解決
+nginx設定ファイルの index に stat.html を追加した。
+
+index index.html stat.html;
+
+その後、以下を実行した。
+
+sudo nginx -t
+sudo systemctl reload nginx
+
+### 学び
+root が正しくても、/ にアクセスした時に表示されるファイルは index の指定によって決まる。
+存在するファイルがあっても、index に指定されていなければ自動表示されない。
+403は権限だけでなく、「ディレクトリはあるが表示できるindexファイルがない」場合にも発生する。
