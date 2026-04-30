@@ -13,3 +13,6 @@ nginx: configuration file /etc/nginx/nginx.conf test failed
 ファイルの終わり
 unexpected end of file
 ファイルの終わりに予想外のミス
+
+## 直し方
+外した波カッコを外した行のところにつけ直す
