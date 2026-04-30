@@ -11,4 +11,4 @@ nginx: configuration file /etc/nginx/nginx.conf test failed
 /etc/nginx/sites-enabled/defaultファイルの23行目で重大なミス
 無効パラメータ
 ・何が足りないか
-"listen"がおかしいらしい。みに行ってみると「;」がなかった
+"listen"がおかしい。みに行ってみると「;」がなかった
