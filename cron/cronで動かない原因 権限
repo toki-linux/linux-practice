@@ -1,0 +1,21 @@
+## 権限問題
+
+権限問題
+❌ ダメな例
+crontab -e（一般ユーザー）
+→ systemctl restart nginx
+
+👉
+
+権限エラー
+⭕ 正解
+sudo crontab -e
+
+または
+
+sudo systemctl restart nginx
+
+（※ただしsudo設定必要）
+
+## 補足
+cronは「登録したユーザー」で動く
