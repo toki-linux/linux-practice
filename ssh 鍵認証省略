@@ -52,3 +52,8 @@ chmod 700 ~/.ssh
 chmod 600 ~/.ssh/config
 また、ファイル名は ssh_config ではなく config にする必要がある。
 
+## 構図
+ssh接続時は、sshコマンドが
+コマンドライン → ~/.ssh/config → /etc/ssh/ssh_config
+の順で設定を読み込み、
+必要な情報が揃えばその内容で接続する
