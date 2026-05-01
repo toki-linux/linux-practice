@@ -1,0 +1,23 @@
+## 環境変数
+
+環境変数問題
+❌ ダメな例
+systemctl restart nginx
+
+👉 cronだと
+
+command not found
+
+になることある
+
+⭕ 正解
+/usr/bin/systemctl restart nginx
+
+## 理由
+cronはPATHが少ない（/usr/bin とかが無い場合ある）
+
+## 対策（おすすめ）
+
+スクリプトの最初に👇
+
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
