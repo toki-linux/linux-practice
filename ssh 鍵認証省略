@@ -1,0 +1,54 @@
+## 目的
+ssh接続を行う際に、コマンドを毎回正確に書くのが面倒なので省略して打ってもいいようにする
+
+## 流れ
+まず繋がるか試してみる
+ssh -p 2222 -i ~/.ssh/id_rsa toki@localhost
+一旦接続を抜けて、Macの設定ファイルの中から  /etc/ssh/ssh_config　を見つける
+編集する
+Host myserver
+  HostName 192.168.1.10
+  User toki
+  Port 22
+  IdentityFile ~/.ssh/id_rsa
+繋がるから試す
+繋がらない。
+
+この流れは間違いだらけである
+
+
+## 正しい流れ
+繋がるか試す
+ssh -p 2222 -i ~/.ssh/id_rsa toki@localhost
+繋がったのを確認したのち接続を抜ける
+なぜこのようなことをした？
+→ 設定しても繋がらない理由で、サーバ側の問題であることをなくしたかったため。
+繋がるということは、サーバは起動しておりSSHサービスも起動、ポートも開いている。
+設定ファイル ~/.ssh/configを作成し、ファイル内に情報を記載することで省略できる
+nano ~/.ssh/config 
+中身
+Host myserver      　　　　　　 myserverと打つだけで
+　HostName  localhost  　　　　localhost宛に
+  User      toki              tokiユーザとして
+  Port      2222              ポートは2222番使用
+  IdentityFile  ~/.ssh/id_rsa     秘密鍵は~/.ssh/id_rsaに指定
+つまり、
+ssh myserverと打てば~/.ssh/configファイルに設定してある通りの内容でssh接続をしてくれる
+ssh myserverの場合、ポート2222番を開けているlocalhostのtokiというユーザに秘密鍵~/.ssh/id_rsaを提示すればその先のあいてサーバまで
+ポートフォワーディングでssh接続してくれ
+
+
+なぜ~/.ssh/configはそのようなことができるのか？
+→ SSHは起動時に
+~/.ssh/config が存在すれば読む
+なければスキップ
+
+## まとめ
+~/.ssh/config は手動で作成する必要がある。
+作るだけでSSHは自動的に読み込むが、
+ディレクトリとファイルの権限が適切でない場合は無視される。
+正しい設定は以下の通り：
+chmod 700 ~/.ssh
+chmod 600 ~/.ssh/config
+また、ファイル名は ssh_config ではなく config にする必要がある。
+
