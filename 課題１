@@ -68,3 +68,8 @@ nginxが「末尾に / が必要」と判断
 /app/ にリダイレクトした
 ↓
 301 Moved Permanently
+
+## 学び
+
+location /app/ は、末尾スラッシュありのURLを前提にする。
+/app でアクセスすると、nginxが /app/ に301リダイレクトすることがある。
