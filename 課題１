@@ -1,0 +1,70 @@
+次やるべき具体タスク
+nginxで /app にアクセスしたら
+Pythonサーバに転送する構成を作れ
+
+条件
+nginx：80番
+Pythonサーバ：3001番
+URL：http://localhost/app
+① Pythonサーバを3001番で起動
+② nginxの /app を 127.0.0.1:3001 に転送
+③ curl http://localhost/app でPython側の内容が返る
+④ error.log / access.log / ss で確認
+
+行った手順
+
+1. nginx状態確認
+systemctl status nginx  今回activeだったので、次に行く
+2. ポートが開いているか確認
+ss -tulnp | grep :80   listen状態だった
+3. nginx設定ファイルを開きproxyが設定されているか確認
+sudo nano /etc/nginx/sites-enabled/default
+locationの欄を見る
+  location /app/ {
+                # First attempt to serve request as file, then
+                # as directory, then fall back to displaying a 404.
+                #try_files $uri $uri/ =404;
+                #alias /var/www/img/;
+                proxy_pass http://127.0.0.1:3001/;
+        }
+設定が完了したら
+4. pythonサーバ起動
+python3 -m http.server 3001
+この時、サーバとして使用したいディレクトリに移動してそこで上のコマンド行う。index.htmlファイルも入れておく
+
+5. クライアントがリクエストする
+curl http://localhost/app/
+
+
+ちなみに
+ location /app/ {
+                # First attempt to serve request as file, then
+                # as directory, then fall back to displaying a 404.
+                #try_files $uri $uri/ =404;
+                #alias /var/www/img/;
+                proxy_pass http://127.0.0.1:3001;
+        }
+proxy_passのところで/でちゃんと区切れていなければ、パスがくっついて存在しないファイルの404コードになる
+
+
+curl http://localhost/appとするとどうなるのか？
+謎のエラーコード301が出た。永続的に動いている？
+toki@tokiMacBook-Pro ~ % curl http://localhost:8080/app
+<html>
+<head><title>301 Moved Permanently</title></head>
+<body>
+<center><h1>301 Moved Permanently</h1></center>
+<hr><center>nginx/1.18.0 (Ubuntu)</center>
+</body>
+</html>
+
+301の正体
+/app にアクセスした
+↓
+nginxの設定は location /app/ になっている
+↓
+nginxが「末尾に / が必要」と判断
+↓
+/app/ にリダイレクトした
+↓
+301 Moved Permanently
