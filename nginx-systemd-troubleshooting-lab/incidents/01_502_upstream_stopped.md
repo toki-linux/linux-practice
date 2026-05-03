@@ -7,10 +7,10 @@ pythonサーバのwebページが見えること
 ## 実際の状態
 502 bad gateway
 ## 原因候補
-nginx未起動
-ポートが開いていない
-proxyの設定ミス
-pythonサービスの設定ミス
+nginx未起動  
+ポートが開いていない  
+proxyの設定ミス  
+pythonサービスの設定ミス  
 ## 確認したログ・コマンド
 Nginxの状態
 systemctl status nginx
