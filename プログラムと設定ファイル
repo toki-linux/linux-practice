@@ -1,0 +1,215 @@
+僕の中ではプログラムと設定ファイルの区別ができないのだけど、プログラムってスクリプト＋設定ファイルっていう認識でok?
+
+
+結論から言うと、
+
+プログラム = 実際に動くもの
+設定ファイル = 動くものにルールを教えるもの
+それ単体で動くけるか見る。設定ファイルは単体では動けない。ルール決めてるだけ。スクリプトは自分で決めれるプログラムって感じ
+
+なので、
+
+プログラム = スクリプト + 設定ファイル
+
+と考えると、少しズレる。
+
+近い言い方に直すなら、こっち。
+
+サービス = プログラム + 設定ファイル + systemdによる管理
+プログラムとは
+
+プログラムは、実行されて処理をするもの。
+
+例：
+
+nginx
+python3
+bash
+cat
+ls
+
+これは全部「動くもの」。
+
+だからこう打てる。
+
+nginx
+python3
+bash
+ls
+cat
+
+もちろん、実行にはオプションや引数がつくこともある。
+
+nginx -t
+python3 app.py
+ls -la
+cat /etc/passwd
+スクリプトとは
+
+スクリプトは、人間が書いた処理手順のファイル。
+
+例：
+
+#!/bin/bash
+
+echo "hello"
+
+これはファイルだけど、実行権をつければ動かせる。
+
+chmod +x hello.sh
+./hello.sh
+
+つまりスクリプトは、
+
+自分で書けるタイプのプログラム
+
+と思ってOK。
+
+設定ファイルとは
+
+設定ファイルは、それ単体では基本的に動かないファイル。
+
+例：
+
+/etc/nginx/sites-enabled/default
+/etc/systemd/system/myapp.service
+/etc/ssh/sshd_config
+/etc/rsyslog.conf
+
+これらは「実行するもの」ではなく、
+
+nginxさん、このルールで動いてね
+systemdさん、このサービスはこう起動してね
+sshdさん、この設定でSSHを受けてね
+
+と教えるためのファイル。
+
+だから、設定ファイルを直接こう実行するわけではない。
+
+/etc/systemd/system/myapp.service
+今回の myapp.service は何？
+
+myapp.service はプログラムではない。
+
+これは、
+
+systemdに「myappをどう起動するか」を教える設定ファイル
+
+中身はたとえばこう。
+
+[Unit]
+Description=My Python App Service
+
+[Service]
+ExecStart=/usr/bin/python3 /home/toki/myapp/app.py
+
+[Install]
+WantedBy=multi-user.target
+
+ここで実際に動くプログラムはこれ。
+
+/usr/bin/python3
+
+そして、Pythonに読ませているスクリプトがこれ。
+
+/home/toki/myapp/app.py
+
+myapp.service は、それをsystemdに教えているだけ。
+
+nginxの場合
+
+nginx はプログラム。
+
+/usr/sbin/nginx
+
+設定ファイルはこっち。
+
+/etc/nginx/nginx.conf
+/etc/nginx/sites-enabled/default
+
+関係はこう。
+
+nginxプログラム
+  ↓ 読む
+nginx設定ファイル
+  ↓ 内容に従う
+Webサーバとして動く
+
+だから、
+
+sudo nginx -t
+
+は、
+
+nginxプログラムに、設定ファイルをチェックさせている
+
+ということ。
+
+きれいに分けるとこう
+プログラム
+= 実行されて処理するもの
+
+スクリプト
+= 人間が書いたプログラムの一種
+
+設定ファイル
+= プログラムに動き方を教えるもの
+
+サービス
+= プログラムをsystemdが管理している状態
+
+今回の構成ならこう。
+
+Pythonアプリ
+= app.py というスクリプト
+
+python3
+= app.pyを実行するプログラム
+
+myapp.service
+= systemdに「python3 app.py を起動して」と教える設定ファイル
+
+myapp
+= systemd上で管理されるサービス名
+一番大事な見分け方
+
+迷ったらこれ。
+
+それ単体で実行して処理するものか？
+
+実行して処理するなら、プログラム寄り。
+
+python3
+nginx
+ls
+bash
+./hello.sh
+
+何かに読まれてルールとして使われるなら、設定ファイル寄り。
+
+/etc/nginx/sites-enabled/default
+/etc/systemd/system/myapp.service
+/etc/ssh/sshd_config
+超ざっくり言うと
+プログラム = 作業する人
+設定ファイル = 作業マニュアル
+systemd = 作業員を管理する上司
+サービス = 上司に管理されて動いている作業員
+
+今回なら、
+
+python3 = 作業する人
+app.py = 作業内容の台本
+myapp.service = 上司への指示書
+systemd = 上司
+myapp = 管理名
+
+だから、
+
+プログラム = スクリプト + 設定ファイル
+
+ではなく、
+
+プログラムは動くもの。
+設定ファイルは動かし方を決めるもの。
+スクリプトは自分で書いたプログラムの一種。
