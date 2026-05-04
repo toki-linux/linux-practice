@@ -1,0 +1,163 @@
+# 05 502 Bad Gateway - Pythonアプリのbind先ミス
+
+## 症状
+curlでアクセスした時502が表示される
+
+## 期待される状態
+pythonサーバのwebページが表示される
+
+## 実際の状態
+502 bad gateway
+
+## 原因候補
+- Pythonアプリサービスが起動していない
+- Nginx設定ファイルのproxy_pass設定が間違っている
+- Pythonアプリが3000番でLISTENしていない
+- Pythonアプリが別のIPやポートでLISTENしている
+- myapp.service設定ファイルが間違っている
+
+## 確認したログ・コマンド
+
+### 1. Nginxの状態確認
+実行コマンド：
+systemctl status nginx
+
+結果：
+● nginx.service - A high performance web server and a reverse proxy server
+     Loaded: loaded (/usr/lib/systemd/system/nginx.service; enabled; preset: enabled)
+     Active: active (running)
+判断：
+activeなので起動している
+---
+
+### 2. Pythonアプリサービスの状態確認
+実行コマンド：
+systemctl status myapp
+
+結果：
+● myapp.service - My Python App Service
+     Loaded: loaded (/etc/systemd/system/myapp.service; disabled; preset: enabled)
+     Active: active (running)
+判断：
+activeなので起動している
+---
+
+### 3. ポート確認
+実行コマンド：
+ss -tulnp | grep -E '(:80|:3000)'
+
+結果：
+tcp   LISTEN 0      511        0.0.0.0:80          0.0.0.0:*    users:(("nginx",pid=1280,fd=6))
+tcp   LISTEN 0      5        192.168.1.50:3000     0.0.0.0:*    users:(("python3",pid=1880,fd=3))
+判断：
+80番も3000番もlisten状態
+---
+
+### 4. Pythonアプリ単体の確認 1
+実行コマンド：
+curl http://127.0.0.1:3000
+
+結果：
+curl: (7) Failed to connect to 127.0.0.1 port 3000 after 0 ms: Connection refused
+判断：
+127.0.0.1 port 3000に接続しようとして失敗
+---
+
+### 5. Pythonアプリ単体の確認 2
+実行コマンド：
+curl http://192.168.1.50:3000
+
+結果：
+Hello from Python App Service
+判断：
+pythonアプリへ192.168.1.50:3000で
+直接通信はできる
+---
+
+### 6. Nginx経由の確認
+実行コマンド：
+curl http://localhost/app/
+
+結果：
+<html>
+<head><title>502 Bad Gateway</title></head>
+<body>
+<center><h1>502 Bad Gateway</h1></center>
+<hr><center>nginx/1.24.0</center>
+</body>
+</html>
+判断：
+nginxの/app/の設定で経由すると502エラー
+---
+
+### 7. Nginx access.logの確認
+実行コマンド：
+sudo tail -n 20 /var/log/nginx/access.log
+
+結果：
+127.0.0.1 - - [03/May/2026:12:35:12 +0900] "GET /app/ HTTP/1.1" 502 157 "-" "curl/8.5.0"
+判断：
+502を取得
+---
+
+### 8. Nginx error.logの確認
+【Nginx error.log】
+
+実行コマンド：
+sudo tail -n 30 /var/log/nginx/error.log
+
+結果：
+2026/05/03 12:35:12 [error] 1283#1283: *31 connect() failed (111: Connection refused) while connecting to upstream, client: 127.0.0.1, server: _, request: "GET /app/ HTTP/1.1", upstream: "http://127.0.0.1:3000/", host: "localhost"
+判断：
+http://127.0.0.1:3000/これだと接続失敗するらしい
+---
+
+### 9. myapp.serviceのExecStart確認
+実行コマンド：
+grep -n "ExecStart" /etc/systemd/system/myapp.service
+
+結果：
+8:ExecStart=/usr/bin/python3 -m http.server 3000 --bind 192.168.1.50
+判断：
+/usr/bin/python3 -m http.server 3000 --bind 192.168.1.50は192.168.1.50のIPアドレスでポート3000だけを作業ディレクトリにしてる
+---
+
+### 10. Nginx設定ファイルのproxy_pass確認
+実行コマンド：
+grep -n "proxy_pass" /etc/nginx/sites-enabled/default
+
+結果：
+48:        proxy_pass http://127.0.0.1:3000/;
+判断：
+proxy_passはhttpプロトコルで127.0.0.1のポート3000番にアクセスを流す
+
+## 切り分け
+nginxサービスは起動している
+pythonサービスも起動している
+ポートも両サービスlisten状態
+127.0.0.1:3000のpythonサーバにアクセスできるかcurlで確認するとできなかった
+192.168.1.50:3000のpythonサーバにアクセスできるかcurlで確認するとできた
+nginx経由のcurl接続も失敗した
+nginxのaccess.logで502を取得
+nginxのerror.logでhttp://127.0.0.1:3000/だと接続失敗することを確認
+pythonサービスの設定ファイルの中身確認すると192.168.1.50だけしか受付ていない
+nginx設定ファイルのproxy_passにはhttp://127.0.0.1:3000/で設定してある
+## 原因
+nginx設定ファイルのproxy_passとpythonサービスのExecStart=/usr/bin/python3 -m http.server 3000 --bind 192.168.1.50がずれている。
+なので中継し、その流す先の場所にpythonサービスが待ち受けていない状況
+
+## 解決
+nginx設定ファイルのproxyを変える
+proxy_pass http://192.168.1.50:3000
+pythonサービス設定ファイルでlocalで受け付けるようにする
+ExecStart=/usr/bin/python3 -m http.server 3000 --bind 127.0.0.1
+
+## 解決後の確認
+直接pythonアプリにcurlできるか確認
+その後、nginx経由でcurlできるか確認
+
+
+## 学び
+pythonサービス設定ファイルの--bindの使い方と注意点
+
+
